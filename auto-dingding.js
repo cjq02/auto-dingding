@@ -88,6 +88,8 @@ let isScreenOn = false;
 
 let curPackage = "";
 
+let curActivity = "";
+
 let battery = 0;
 
 // 检查无障碍权限
@@ -166,6 +168,20 @@ function notificationHandler(n) {
     return;
   }
 
+  // 监听钉钉返回的考勤结果
+  if (packageId == PACKAGE_ID_DD && noticeText.indexOf("考勤打卡") >= 0) {
+    setStorageData(
+      "dingding",
+      "clockResult",
+      getCurrentDate() + " " + noticeText
+    );
+    threads.shutDownAll();
+    threads.start(function () {
+      sendKaoqinResult();
+    });
+    return;
+  }
+
   switch (noticeText) {
     case "打卡": // 监听文本为 "打卡" 的通知
       needWaiting = false;
@@ -176,84 +192,118 @@ function notificationHandler(n) {
       break;
 
     case "考勤结果": // 监听文本为 "查询" 的通知
-      console.log("查询");
+      console.log("考勤结果");
       threads.shutDownAll();
       threads.start(function () {
-        switch (DEFAULT_MESSAGE_DELIVER) {
-          case PUSH_METHOD.QQ:
-            sendQQMsg(getStorageData("dingding", "clockResult"));
-            break;
-          case PUSH_METHOD.Email:
-            sendEmail(
-              "考勤结果",
-              getStorageData("dingding", "clockResult"),
-              null
-            );
-            break;
-          case PUSH_METHOD.ServerChan:
-            sendServerChan(
-              "考勤结果",
-              getStorageData("dingding", "clockResult")
-            );
-            break;
-          case PUSH_METHOD.PushDeer:
-            sendPushDeer("考勤结果", getStorageData("dingding", "clockResult"));
-            break;
-        }
+        sendKaoqinResult();
       });
       break;
-    case "设备查询": {
-      battery = device.getBattery();
-      console.log("当前电量", battery);
-      isScreenOn = device.isScreenOn();
-      console.log("是否亮屏", isScreenOn);
-      sendPushDeer(
-        "设备信息",
-        "当前电量：" + battery + "，是否亮屏：" + isScreenOn
-      );
+    case "设备查询":
+    case "查询设备": {
+      threads.shutDownAll();
+      threads.start(function () {
+        battery = device.getBattery();
+        console.log("当前电量", battery);
+        isScreenOn = device.isScreenOn();
+        console.log("是否亮屏", isScreenOn);
+        curPackage = currentPackage();
+        curActivity = currentActivity();
+        console.log("当前应用", curPackage, curActivity);
+        sendPushDeer(
+          "设备信息",
+          "当前电量：" + battery + "，是否亮屏：" + isScreenOn + "，当前应用：" + curPackage + "，" + curActivity
+        );
+      });
       break;
     }
     case "亮屏": {
-      console.log("正在唤醒设备");
-      device.wakeUpIfNeeded();
-      sleep(1000);
-      isScreenOn = device.isScreenOn();
-      console.log("是否亮屏", isScreenOn);
-      sendPushDeer("唤醒设备", "是否亮屏：" + isScreenOn);
+      threads.shutDownAll();
+      threads.start(function () {
+        console.log("正在唤醒设备");
+        device.wakeUpIfNeeded();
+        sleep(1000);
+        isScreenOn = device.isScreenOn();
+        console.log("是否亮屏", isScreenOn);
+        sendPushDeer("唤醒设备", "是否亮屏：" + isScreenOn);
+      });
       break;
     }
     case "熄屏": {
-      home();
-      sleep(1000);
-      lockScreen();
-      sleep(1000);
-      isScreenOn = device.isScreenOn();
-      curPackage = currentPackage();
-      console.log("是否亮屏", isScreenOn);
-      sendPushDeer(
-        "熄屏",
-        "是否亮屏：" + isScreenOn + "，当前应用：" + curPackage
-      );
+      threads.shutDownAll();
+      threads.start(function () {
+        home();
+        sleep(1000);
+        lockScreen();
+        sleep(1000);
+        isScreenOn = device.isScreenOn();
+        curPackage = currentPackage();
+        console.log("是否亮屏", isScreenOn);
+        sendPushDeer(
+          "熄屏",
+          "是否亮屏：" + isScreenOn + "，当前应用：" + curPackage
+        );
+      });
       break;
     }
     case "当前应用": {
-      curPackage = currentPackage();
-      console.log("当前应用", curPackage);
-      sendPushDeer("当前应用", curPackage);
+      threads.shutDownAll();
+      threads.start(function () {
+        curPackage = currentPackage();
+        curActivity = currentActivity();
+        console.log("当前应用", curPackage, curActivity);
+        sendPushDeer("当前应用", curPackage + "，" + curActivity);
+      });
       break;
     }
     case "返回桌面": {
-      home();
-      sleep(1000);
-      curPackage = currentPackage();
-      console.log("返回桌面成功，当前应用", curPackage);
-      sendPushDeer("返回桌面成功", "当前应用：" + curPackage);
+      threads.shutDownAll();
+      threads.start(function () {
+        home();
+        sleep(1000);
+        curPackage = currentPackage();
+        console.log("返回桌面成功，当前应用", curPackage);
+        sendPushDeer(
+          "返回桌面成功",
+          "当前应用：" + curPackage + "，" + curActivity
+        );
+      });
       break;
     }
     case "打开钉钉": {
-      device.wakeUpIfNeeded();
-      const res = signIn();
-      sendPushDeer("钉钉状态", res);
+      threads.shutDownAll();
+      threads.start(function () {
+        device.wakeUpIfNeeded();
+        const res = signIn();
+        sendPushDeer("钉钉状态", res);
+      });
+      break;
+    }
+    case "最新结果": {
+      threads.shutDownAll();
+      threads.start(function () {
+        device.wakeUpIfNeeded();
+        signIn();
+        attendKaoqin();
+        let resultMessage = "";
+        const list = className("android.view.View").find();
+        for (let i = 0; i < list.length; i++) {
+          if (
+            list[i].getText() !== null &&
+            list[i].getText().toString().indexOf("已打卡") > 0
+          ) {
+            resultMessage += list[i].getText().toString() + "。";
+          }
+        }
+        if (resultMessage === "") {
+          resultMessage += "无打卡记录";
+        }
+        console.log("最新结果", resultMessage);
+        sendPushDeer("最新结果", resultMessage);
+        sleep(1000);
+        home();
+        sleep(1000);
+        lockScreen();
+      });
       break;
     }
     case "暂停": // 监听文本为 "暂停" 的通知
@@ -312,25 +362,26 @@ function notificationHandler(n) {
   }
 }
 
-function sendAttendResult(noticeText) {
+function sendKaoqinResult() {
   // 监听钉钉返回的考勤结果
-    threads.shutDownAll();
-    threads.start(function () {
-      switch (DEFAULT_MESSAGE_DELIVER) {
-        case PUSH_METHOD.QQ:
-          sendQQMsg(noticeText);
-          break;
-        case PUSH_METHOD.Email:
-          sendEmail("考勤结果", noticeText, cameraFilePath);
-          break;
-        case PUSH_METHOD.ServerChan:
-          sendServerChan("考勤结果", noticeText);
-          break;
-        case PUSH_METHOD.PushDeer:
-          sendPushDeer("考勤结果", noticeText);
-          break;
-      }
-    });
+  switch (DEFAULT_MESSAGE_DELIVER) {
+    case PUSH_METHOD.QQ:
+      sendQQMsg(getStorageData("dingding", "clockResult"));
+      break;
+    case PUSH_METHOD.Email:
+      sendEmail(
+        "考勤结果",
+        getStorageData("dingding", "clockResult"),
+        cameraFilePath
+      );
+      break;
+    case PUSH_METHOD.ServerChan:
+      sendServerChan("考勤结果", getStorageData("dingding", "clockResult"));
+      break;
+    case PUSH_METHOD.PushDeer:
+      sendPushDeer("考勤结果", getStorageData("dingding", "clockResult"));
+      break;
+  }
 }
 
 /**
@@ -361,7 +412,6 @@ function doClock() {
     // 下班打卡
     clockOut();
   }
-  sendAttendResult();
   sleep(1000);
   home();
   lockScreen();
@@ -601,13 +651,17 @@ function holdOn() {
  * @description 启动并登陆钉钉
  */
 function signIn() {
+  if (currentPackage() !== "com.alibaba.android.rimet") {
+    app.launchPackage(PACKAGE_ID_DD);
+    console.log("正在启动" + app.getAppName(PACKAGE_ID_DD) + "...");
+
+    setVolume(0); // 设备静音
+
+    sleep(10000); // 等待钉钉启动
+  } else {
+    console.log("已打开钉钉");
+  }
   let signInMsg = "";
-  app.launchPackage(PACKAGE_ID_DD);
-  console.log("正在启动" + app.getAppName(PACKAGE_ID_DD) + "...");
-
-  setVolume(0); // 设备静音
-
-  sleep(10000); // 等待钉钉启动
 
   if (
     currentPackage() == PACKAGE_ID_DD &&
@@ -671,6 +725,10 @@ function handleLate() {
  * @description 使用 URL Scheme 进入考勤界面
  */
 function attendKaoqin() {
+  if (currentActivity().indexOf("TheOneActivityMainTaskSwipe") > 0) {
+    console.info("已进入考勤界面");
+    return;
+  }
   let url_scheme =
     "dingtalk://dingtalkclient/page/link?url=https://attend.dingtalk.com/attend/index.html";
 
@@ -716,7 +774,7 @@ function clockIn() {
     return;
   }
 
-  textContains("已连接").waitFor();
+  textContains("已进入考勤范围").waitFor();
   console.info("已连接考勤机");
   sleep(1000);
 
@@ -731,7 +789,6 @@ function clockIn() {
   sleep(1000);
   // 处理迟到打卡
   // handleLate();
-
 }
 
 /**
@@ -799,7 +856,7 @@ function lockScreen() {
 
   sleep(1000);
 
-  if (isDeviceLocked()) {
+  if (!device.isScreenOn()) {
     console.info("屏幕已关闭");
   } else {
     console.error("屏幕未关闭, 请尝试其他锁屏方案, 或等待屏幕自动关闭");
