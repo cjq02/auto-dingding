@@ -211,7 +211,14 @@ function notificationHandler(n) {
         console.log("当前应用", curPackage, curActivity);
         sendPushDeer(
           "设备信息",
-          "当前电量：" + battery + "，是否亮屏：" + isScreenOn + "，当前应用：" + curPackage + "，" + curActivity
+          "当前电量：" +
+            battery +
+            "，是否亮屏：" +
+            isScreenOn +
+            "，当前应用：" +
+            curPackage +
+            "，" +
+            curActivity
         );
       });
       break;
@@ -269,7 +276,8 @@ function notificationHandler(n) {
       });
       break;
     }
-    case "打开钉钉": {
+    case "打开钉钉":
+    case "打开应用": {
       threads.shutDownAll();
       threads.start(function () {
         device.wakeUpIfNeeded();
@@ -281,6 +289,7 @@ function notificationHandler(n) {
     case "最新结果": {
       threads.shutDownAll();
       threads.start(function () {
+        const startTime = new Date();
         device.wakeUpIfNeeded();
         signIn();
         attendKaoqin();
@@ -295,8 +304,13 @@ function notificationHandler(n) {
           }
         }
         if (resultMessage === "") {
-          resultMessage += "无打卡记录";
+          resultMessage += "无打卡记录。";
         }
+        const endTime = new Date();
+        resultMessage +=
+          "查询耗时 " +
+          (endTime.getTime() - startTime.getTime()) / 1000 +
+          "秒。";
         console.log("最新结果", resultMessage);
         sendPushDeer("最新结果", resultMessage);
         sleep(1000);
@@ -565,7 +579,7 @@ function sendPushDeer(title, message) {
 
   res = http.post(encodeURI(url), {
     pushkey: PUSH_DEER,
-    text: title,
+    text: title + " " + getCurrentDateTime(),
     desp: message,
     type: "markdown",
   });
@@ -657,7 +671,7 @@ function signIn() {
 
     setVolume(0); // 设备静音
 
-    sleep(10000); // 等待钉钉启动
+    sleep(8000); // 等待钉钉启动
   } else {
     console.log("已打开钉钉");
   }
@@ -735,7 +749,7 @@ function attendKaoqin() {
   if (CORP_ID != "") {
     url_scheme = url_scheme + "?corpId=" + CORP_ID;
   }
-  console.log("CORP_ID", url_scheme);
+  /* console.log("CORP_ID", url_scheme); */
 
   let a = app.intent({
     action: "VIEW",
@@ -887,6 +901,19 @@ function getCurrentDate() {
   let formattedDateString =
     year + "-" + month + "-" + date + "-" + WEEK_DAY[week];
   return formattedDateString;
+}
+
+function getCurrentDateTime() {
+  let currentDate = new Date();
+  let year = dateDigitToString(currentDate.getFullYear());
+  let month = dateDigitToString(currentDate.getMonth() + 1);
+  let date = dateDigitToString(currentDate.getDate());
+  let hours = dateDigitToString(currentDate.getHours());
+  let minute = dateDigitToString(currentDate.getMinutes());
+  let second = dateDigitToString(currentDate.getSeconds());
+  let formattedTimeString =
+    year + "-" + month + "-" + date + " " + hours + ":" + minute + ":" + second;
+  return formattedTimeString;
 }
 
 // 通知过滤器
