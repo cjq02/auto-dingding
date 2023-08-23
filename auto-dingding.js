@@ -163,7 +163,7 @@ function notificationHandler(n) {
     needWaiting = true;
     threads.shutDownAll();
     threads.start(function () {
-      doClock();
+      doTimeClock();
     });
     return;
   }
@@ -259,9 +259,11 @@ function notificationHandler(n) {
         curActivity = currentActivity();
         console.log("当前应用", curPackage, curActivity);
         sendPushDeer("当前应用", curPackage + "，" + curActivity);
+        /* sendEmail("当前应用", curPackage + "，" + curActivity); */
       });
       break;
     }
+    case "返回首页":
     case "返回桌面": {
       threads.shutDownAll();
       threads.start(function () {
@@ -396,6 +398,9 @@ function sendKaoqinResult() {
       sendPushDeer("考勤结果", getStorageData("dingding", "clockResult"));
       break;
   }
+  home();
+  sleep(1000);
+  lockScreen();
 }
 
 /**
@@ -428,6 +433,25 @@ function doClock() {
   }
   sleep(1000);
   home();
+  lockScreen();
+}
+
+function doTimeClock() {
+  currentDate = new Date();
+  console.log("本地时间: " + getCurrentDate() + " " + getCurrentTime());
+  console.log("开始打卡流程!");
+
+  // 唤醒屏幕
+  brightScreen();
+  // 解锁屏幕
+  unlockScreen();
+  // 随机等待
+  holdOn();
+  // 自动登录
+  signIn();
+  sleep(1000);
+  home();
+  sleep(1000);
   lockScreen();
 }
 
@@ -464,14 +488,16 @@ function sendEmail(title, message, attachFilePath) {
     }
   }
 
+  home();
+
   console.log("选择邮件应用");
-  // waitForActivity("com.android.internal.app.ChooserActivity") // 等待选择应用界面弹窗出现, 如果设置了默认应用就注释掉
 
-  let emailAppName = app.getAppName(PACKAGE_ID_MAIL_163);
+  // 等待选择应用界面弹窗出现, 如果设置了默认应用就注释掉
+  /* waitForActivity("com.android.internal.app.ChooserActivity") 
 
-  /* app.launchApp(emailAppName) */
+  let emailAppName = app.getAppName(PACKAGE_ID_MAIL_163); */
 
-  console.log("emailAppName", emailAppName);
+  /* console.log("emailAppName", emailAppName);
   if (null != emailAppName) {
     if (null != textMatches(emailAppName).findOne(1000)) {
       btn_email = textMatches(emailAppName).findOnce().parent();
@@ -480,7 +506,9 @@ function sendEmail(title, message, attachFilePath) {
   } else {
     console.error("不存在应用: " + PACKAGE_ID_MAIL_163);
     return;
-  }
+  } */
+
+  click("网易邮箱大师");
 
   // 网易邮箱大师
   let versoin = getPackageVersion(PACKAGE_ID_MAIL_163);
@@ -492,27 +520,33 @@ function sendEmail(title, message, attachFilePath) {
     id("send").findOne().click();
   } else {
     // 网易邮箱大师 7
-    waitForActivity(
+    /* waitForActivity(
       "com.netease.mobimail.module.mailcompose.MailComposeActivity"
-    );
+    ); */
+    sleep(5000);
+    id("fab_compose").findOne().click();
     let input_address = id("input").findOne();
+    let input_subject = id('et_subject').findOne();
+    let input_edit = id('compose_edit').findOne();
     if (null == input_address.getText()) {
       input_address.setText(EMAILL_ADDRESS);
     }
-    id("iv_arrow").findOne().click();
-    sleep(1000);
-    id("img_send_bg").findOne().click();
-  }
+    
+    input_subject.setText(title);
+    input_edit.setText(message);
 
-  // 内置电子邮件
-  // waitForActivity("com.kingsoft.mail.compose.ComposeActivity")
-  // id("compose_send_btn").findOne().click()
+    sleep(2000);
+    id("iv_arrow").findOne().click();
+    /* 
+    sleep(1000);
+    id("img_send_bg").findOne().click(); */
+  }
 
   console.log("正在发送邮件...");
 
-  home();
+  /* home();
   sleep(2000);
-  lockScreen(); // 关闭屏幕
+  lockScreen(); // 关闭屏幕 */
 }
 
 /**
