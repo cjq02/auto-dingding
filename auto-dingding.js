@@ -215,6 +215,8 @@ function notificationHandler(n) {
             battery +
             "，是否亮屏：" +
             isScreenOn +
+            "，是否暂停：" +
+            suspend +
             "，当前应用：" +
             curPackage +
             "，" +
@@ -327,20 +329,7 @@ function notificationHandler(n) {
       console.warn("暂停定时打卡");
       threads.shutDownAll();
       threads.start(function () {
-        switch (DEFAULT_MESSAGE_DELIVER) {
-          case PUSH_METHOD.QQ:
-            sendQQMsg("修改成功, 已暂停定时打卡功能");
-            break;
-          case PUSH_METHOD.Email:
-            sendEmail("修改成功", "已暂停定时打卡功能", null);
-            break;
-          case PUSH_METHOD.ServerChan:
-            sendServerChan("修改成功", "已暂停定时打卡功能");
-            break;
-          case PUSH_METHOD.PushDeer:
-            sendPushDeer("修改成功", "已暂停定时打卡功能");
-            break;
-        }
+        sendPushDeer("修改成功", "已暂停定时打卡功能");
       });
       break;
 
@@ -349,20 +338,7 @@ function notificationHandler(n) {
       console.warn("恢复定时打卡");
       threads.shutDownAll();
       threads.start(function () {
-        switch (DEFAULT_MESSAGE_DELIVER) {
-          case PUSH_METHOD.QQ:
-            sendQQMsg("修改成功, 已恢复定时打卡功能");
-            break;
-          case PUSH_METHOD.Email:
-            sendEmail("修改成功", "已恢复定时打卡功能", null);
-            break;
-          case PUSH_METHOD.ServerChan:
-            sendServerChan("修改成功", "已恢复定时打卡功能");
-            break;
-          case PUSH_METHOD.PushDeer:
-            sendPushDeer("修改成功", "已恢复定时打卡功能");
-            break;
-        }
+        sendPushDeer("修改成功", "已恢复定时打卡功能");
       });
       break;
 
