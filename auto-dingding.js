@@ -502,12 +502,12 @@ function sendEmail(title, message, attachFilePath) {
     sleep(5000);
     id("fab_compose").findOne().click();
     let input_address = id("input").findOne();
-    let input_subject = id('et_subject').findOne();
-    let input_edit = id('compose_edit').findOne();
+    let input_subject = id("et_subject").findOne();
+    let input_edit = id("compose_edit").findOne();
     if (null == input_address.getText()) {
       input_address.setText(EMAILL_ADDRESS);
     }
-    
+
     input_subject.setText(title);
     input_edit.setText(message);
 
@@ -777,6 +777,11 @@ function attendKaoqin() {
  * @description 上班打卡
  */
 function clockIn() {
+  const currentDate = new Date();
+  if (currentDate.getHours() < 9) {
+    sendPushDeer("上班打卡失败", "未到上班时间，不能打卡！");
+    return console.log("未到上班时间，不能打卡！");
+  }
   console.log("上班打卡...");
 
   if (null != textContains("已打卡").findOne(1000)) {
