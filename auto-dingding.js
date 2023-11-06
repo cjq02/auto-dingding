@@ -33,7 +33,7 @@ const PACKAGE_ID_PUSHDEER = "com.pushdeer.os"; // Push Deer
 const PACKAGE_ID_DESKCLOCK = "com.android.deskclock";
 
 const LOWER_BOUND = 1 * 60 * 1000; // 最小等待时间：1min
-const UPPER_BOUND = 5 * 60 * 1000; // 最大等待时间：5min
+const UPPER_BOUND = 3 * 60 * 1000; // 最大等待时间：5min
 
 // 执行时的屏幕亮度（0-255）, 需要"修改系统设置"权限
 const SCREEN_BRIGHTNESS = 20;
@@ -169,7 +169,7 @@ function notificationHandler(n) {
   }
 
   // 监听钉钉返回的考勤结果
-  if (packageId == PACKAGE_ID_DD && noticeText.indexOf("考勤打卡") >= 0) {
+  if (packageId == PACKAGE_ID_DD && noticeText !== null && noticeText.indexOf("考勤打卡") >= 0) {
     setStorageData(
       "dingding",
       "clockResult",
@@ -322,6 +322,48 @@ function notificationHandler(n) {
         sleep(1000);
         lockScreen();
       });
+      break;
+    }
+    case "更新打卡": {
+      threads.shutDownAll();
+      threads.start(function() {
+        let updateSuccess = false
+        device.wakeUpIfNeeded();
+        signIn();
+        attendKaoqin();
+        const list = className("android.view.View").find();
+        for (let i = 0; i < list.length; i++) {
+          if (
+            list[i].getText() !== null &&
+            list[i].getText().toString().indexOf("更新打卡2") >= 0
+          ) {
+            console.log('找到更新打卡按钮')
+            list[i].click();
+            sleep(1000);
+            sendPushDeer("正在更新打卡", "");
+            const buttons = className("android.widget.Button").find()
+            for (let j = 0; j < buttons.length; j++) {
+              if (
+                buttons[j].getText() !== null &&
+                buttons[j].getText().toString().indexOf("确定") >= 0
+              ) {
+                  console.log("找到确定按钮", buttons[j].getText())
+                  buttons[j].click();
+                  updateSuccess = true
+                  break;
+              }
+            }
+            break;
+          }
+        }
+        if (!updateSuccess) {
+          sendPushDeer("更新打卡失败", "没有找到更新按钮")
+        }
+        sleep(1000);
+        home();
+        sleep(1000);
+        lockScreen();
+      })
       break;
     }
     case "暂停": // 监听文本为 "暂停" 的通知
@@ -583,7 +625,7 @@ function sendServerChan(title, message) {
  * @param {string} message 消息
  */
 function sendPushDeer(title, message) {
-  console.log("向 PushDeer 发起推送请求");
+  console.log("向 PushDeer 发起推送请求", title, message);
 
   url = "https://api2.pushdeer.com/message/push";
 
@@ -662,12 +704,12 @@ function holdOn() {
   }
 
   let randomTime = random(LOWER_BOUND, UPPER_BOUND);
-  toastLog(
-    Math.floor(randomTime / 1000) +
-      "秒后启动" +
-      app.getAppName(PACKAGE_ID_DD) +
-      "..."
-  );
+  const msg = Math.floor(randomTime / 1000) +
+  "秒后启动" +
+  app.getAppName(PACKAGE_ID_DD) +
+  "..."
+  toastLog(msg);
+  sendPushDeer("随机等待",msg);
   sleep(randomTime);
 }
 
