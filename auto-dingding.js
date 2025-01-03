@@ -33,7 +33,7 @@ const PACKAGE_ID_PUSHDEER = "com.pushdeer.os"; // Push Deer
 const PACKAGE_ID_DESKCLOCK = "com.android.deskclock";
 
 const LOWER_BOUND = 1 * 60 * 1000; // 最小等待时间：1min
-const UPPER_BOUND = 3 * 60 * 1000; // 最大等待时间：5min
+const UPPER_BOUND = 2 * 60 * 1000; // 最大等待时间：2min
 
 // 执行时的屏幕亮度（0-255）, 需要"修改系统设置"权限
 const SCREEN_BRIGHTNESS = 20;
@@ -152,7 +152,14 @@ function notificationHandler(n) {
   let packageId = n.getPackageName(); // 获取通知包名
   let abstract = n.tickerText; // 获取通知摘要
   let noticeText = n.getText(); // 获取通知文本
-  console.log("监听", packageId, abstract, noticeText);
+  console.log(
+    "监听",
+    packageId,
+    "abstract",
+    abstract,
+    "noticeText",
+    noticeText
+  );
   // 过滤 PackageId 白名单之外的应用所发出的通知
   if (!filterNotification(packageId, abstract, noticeText)) {
     return;
@@ -167,9 +174,20 @@ function notificationHandler(n) {
     });
     return;
   }
+  if (abstract === "定时设备查询") {
+    threads.shutDownAll();
+    threads.start(function () {
+      sendDeviceQuery("定时设备查询");
+    });
+    return;
+  }
 
   // 监听钉钉返回的考勤结果
-  if (packageId == PACKAGE_ID_DD && noticeText !== null && noticeText.indexOf("考勤打卡") >= 0) {
+  if (
+    packageId == PACKAGE_ID_DD &&
+    noticeText !== null &&
+    noticeText.indexOf("考勤打卡") >= 0
+  ) {
     setStorageData(
       "dingding",
       "clockResult",
@@ -202,26 +220,7 @@ function notificationHandler(n) {
     case "查询设备": {
       threads.shutDownAll();
       threads.start(function () {
-        battery = device.getBattery();
-        console.log("当前电量", battery);
-        isScreenOn = device.isScreenOn();
-        console.log("是否亮屏", isScreenOn);
-        curPackage = currentPackage();
-        curActivity = currentActivity();
-        console.log("当前应用", curPackage, curActivity);
-        sendPushDeer(
-          "设备信息",
-          "当前电量：" +
-            battery +
-            "，是否亮屏：" +
-            isScreenOn +
-            "，是否暂停：" +
-            suspend +
-            "，当前应用：" +
-            curPackage +
-            "，" +
-            curActivity
-        );
+        sendDeviceQuery();
       });
       break;
     }
@@ -233,7 +232,12 @@ function notificationHandler(n) {
         sleep(1000);
         isScreenOn = device.isScreenOn();
         console.log("是否亮屏", isScreenOn);
-        sendPushDeer("唤醒设备", "是否亮屏：" + isScreenOn);
+        sendPushDeer(
+          "唤醒设备",
+          "是否亮屏：" +
+            isScreenOn +
+            getDeviceQueryInfo({ isPaddingLine: true })
+        );
       });
       break;
     }
@@ -249,7 +253,11 @@ function notificationHandler(n) {
         console.log("是否亮屏", isScreenOn);
         sendPushDeer(
           "熄屏",
-          "是否亮屏：" + isScreenOn + "，当前应用：" + curPackage
+          "是否亮屏：" +
+            isScreenOn +
+            "，当前应用：" +
+            curPackage +
+            getDeviceQueryInfo({ isPaddingLine: true })
         );
       });
       break;
@@ -260,13 +268,19 @@ function notificationHandler(n) {
         curPackage = currentPackage();
         curActivity = currentActivity();
         console.log("当前应用", curPackage, curActivity);
-        sendPushDeer("当前应用", curPackage + "，" + curActivity);
+        sendPushDeer(
+          "当前应用",
+          curPackage +
+            "，" +
+            curActivity +
+            getDeviceQueryInfo({ isPaddingLine: true })
+        );
         /* sendEmail("当前应用", curPackage + "，" + curActivity); */
       });
       break;
     }
-    case "返回首页":
-    case "返回桌面": {
+    case "桌面":
+    case "首页": {
       threads.shutDownAll();
       threads.start(function () {
         home();
@@ -275,7 +289,11 @@ function notificationHandler(n) {
         console.log("返回桌面成功，当前应用", curPackage);
         sendPushDeer(
           "返回桌面成功",
-          "当前应用：" + curPackage + "，" + curActivity
+          "当前应用：" +
+            curPackage +
+            "，" +
+            curActivity +
+            getDeviceQueryInfo({ isPaddingLine: true })
         );
       });
       break;
@@ -286,7 +304,10 @@ function notificationHandler(n) {
       threads.start(function () {
         device.wakeUpIfNeeded();
         const res = signIn();
-        sendPushDeer("钉钉状态", res);
+        sendPushDeer(
+          "钉钉状态",
+          res + getDeviceQueryInfo({ isPaddingLine: true })
+        );
       });
       break;
     }
@@ -316,7 +337,10 @@ function notificationHandler(n) {
           (endTime.getTime() - startTime.getTime()) / 1000 +
           "秒。";
         console.log("最新结果", resultMessage);
-        sendPushDeer("最新结果", resultMessage);
+        sendPushDeer(
+          "最新结果",
+          resultMessage + getDeviceQueryInfo({ isPaddingLine: true })
+        );
         sleep(1000);
         home();
         sleep(1000);
@@ -326,44 +350,54 @@ function notificationHandler(n) {
     }
     case "更新打卡": {
       threads.shutDownAll();
-      threads.start(function() {
-        let updateSuccess = false
+      threads.start(function () {
+        let updateSuccess = false;
         device.wakeUpIfNeeded();
-        signIn();
+        const res = signIn();
+        sendPushDeer(
+          "钉钉状态",
+          res + getDeviceQueryInfo({ isPaddingLine: true })
+        );
         attendKaoqin();
         const list = className("android.view.View").find();
         for (let i = 0; i < list.length; i++) {
           if (
             list[i].getText() !== null &&
-            list[i].getText().toString().indexOf("更新打卡2") >= 0
+            list[i].getText().toString().indexOf("更新打卡") >= 0
           ) {
-            console.log('找到更新打卡按钮')
+            console.log("找到更新打卡按钮");
             list[i].click();
             sleep(1000);
-            sendPushDeer("正在更新打卡", "");
-            const buttons = className("android.widget.Button").find()
+            sendPushDeer(
+              "正在更新打卡",
+              "" + getDeviceQueryInfo({ isPaddingLine: true })
+            );
+            const buttons = className("android.widget.Button").find();
             for (let j = 0; j < buttons.length; j++) {
               if (
                 buttons[j].getText() !== null &&
                 buttons[j].getText().toString().indexOf("确定") >= 0
               ) {
-                  console.log("找到确定按钮", buttons[j].getText())
-                  buttons[j].click();
-                  updateSuccess = true
-                  break;
+                console.log("找到确定按钮", buttons[j].getText());
+                buttons[j].click();
+                updateSuccess = true;
+                break;
               }
             }
             break;
           }
         }
         if (!updateSuccess) {
-          sendPushDeer("更新打卡失败", "没有找到更新按钮")
+          sendPushDeer(
+            "更新打卡失败",
+            "没有找到更新按钮" + getDeviceQueryInfo({ isPaddingLine: true })
+          );
         }
         sleep(1000);
         home();
         sleep(1000);
         lockScreen();
-      })
+      });
       break;
     }
     case "暂停": // 监听文本为 "暂停" 的通知
@@ -371,7 +405,10 @@ function notificationHandler(n) {
       console.warn("暂停定时打卡");
       threads.shutDownAll();
       threads.start(function () {
-        sendPushDeer("修改成功", "已暂停定时打卡功能");
+        sendPushDeer(
+          "修改成功",
+          "已暂停定时打卡功能" + getDeviceQueryInfo({ isPaddingLine: true })
+        );
       });
       break;
 
@@ -380,7 +417,10 @@ function notificationHandler(n) {
       console.warn("恢复定时打卡");
       threads.shutDownAll();
       threads.start(function () {
-        sendPushDeer("修改成功", "已恢复定时打卡功能");
+        sendPushDeer(
+          "修改成功",
+          "已恢复定时打卡功能" + getDeviceQueryInfo({ isPaddingLine: true })
+        );
       });
       break;
 
@@ -393,6 +433,48 @@ function notificationHandler(n) {
 
     default:
       break;
+  }
+}
+
+function getDeviceQueryInfo(options) {
+  if (options === undefined) {
+    options = {};
+  }
+  const isPaddingLine = options.isPaddingLine;
+  battery = device.getBattery();
+  console.log("当前电量", battery);
+  isScreenOn = device.isScreenOn();
+  console.log("是否亮屏", isScreenOn);
+  curPackage = currentPackage();
+  curActivity = currentActivity();
+  console.log("当前应用", curPackage, curActivity);
+  let message =
+    "当前电量：" +
+    battery +
+    "，是否亮屏：" +
+    isScreenOn +
+    "，是否暂停：" +
+    suspend +
+    "，当前应用：" +
+    curPackage +
+    "，" +
+    curActivity;
+  if (isPaddingLine) {
+    message = "\r\n" + message;
+  }
+  return message;
+}
+
+function sendDeviceQuery(title) {
+  sendPushDeer(title || "设备查询", getDeviceQueryInfo());
+  sleep(60000);
+  if (device.isScreenOn()) {
+    sleep(1000);
+    home();
+    sleep(1000);
+    lockScreen();
+    sleep(1000);
+    sendPushDeer("熄屏后再次设备查询", getDeviceQueryInfo());
   }
 }
 
@@ -413,7 +495,7 @@ function sendKaoqinResult() {
       sendServerChan("考勤结果", getStorageData("dingding", "clockResult"));
       break;
     case PUSH_METHOD.PushDeer:
-      sendPushDeer("考勤结果", getStorageData("dingding", "clockResult"));
+      sendPushDeer("考勤结果", getStorageData("dingding", "clockResult") + getDeviceQueryInfo({ isPaddingLine: true }));
       break;
   }
   home();
@@ -436,7 +518,8 @@ function doClock() {
   // 随机等待
   holdOn();
   // 自动登录
-  signIn();
+  const res = signIn();
+  sendPushDeer("钉钉状态", res + getDeviceQueryInfo({ isPaddingLine: true }));
   // 处理迟到
   /* handleLate();  */
   // 考勤打卡
@@ -466,8 +549,26 @@ function doTimeClock() {
   // 随机等待
   holdOn();
   // 自动登录
+  let res = signIn();
+  sendPushDeer("钉钉状态", res + getDeviceQueryInfo({ isPaddingLine: true }));
+  sleep(5000);
+  // 如果没有极速打卡则返回桌面
+  console.log("没有极速打卡，返回桌面1");
+  home();
+  sleep(5000);
+  console.log("重新打开钉钉1");
+  res = signIn();
+  sendPushDeer("钉钉状态", res + getDeviceQueryInfo({ isPaddingLine: true }));
+  sleep(5000);
+  // 如果没有极速打卡则返回桌面
+  console.log("没有极速打卡，返回桌面2");
+  home();
+  sleep(5000);
+  console.log("重新打开钉钉2");
   signIn();
-  sleep(1000);
+  // 如果没有极速打卡则进入考勤
+  attendKaoqin();
+  sleep(5000);
   home();
   sleep(1000);
   lockScreen();
@@ -704,12 +805,13 @@ function holdOn() {
   }
 
   let randomTime = random(LOWER_BOUND, UPPER_BOUND);
-  const msg = Math.floor(randomTime / 1000) +
-  "秒后启动" +
-  app.getAppName(PACKAGE_ID_DD) +
-  "..."
+  const msg =
+    Math.floor(randomTime / 1000) +
+    "秒后启动" +
+    app.getAppName(PACKAGE_ID_DD) +
+    "...";
   toastLog(msg);
-  sendPushDeer("随机等待",msg);
+  sendPushDeer("随机等待", msg + getDeviceQueryInfo({ isPaddingLine: true }));
   sleep(randomTime);
 }
 
@@ -812,7 +914,7 @@ function attendKaoqin() {
   console.log("正在进入考勤界面...");
   textContains("已进入考勤范围").waitFor();
   console.info("已进入考勤界面");
-  sleep(1000);
+  sleep(3000);
 }
 
 /**
@@ -821,7 +923,10 @@ function attendKaoqin() {
 function clockIn() {
   const currentDate = new Date();
   if (currentDate.getHours() < 9) {
-    sendPushDeer("上班打卡失败", "未到上班时间，不能打卡！");
+    sendPushDeer(
+      "上班打卡失败",
+      "未到上班时间，不能打卡！" + getDeviceQueryInfo({ isPaddingLine: true })
+    );
     return console.log("未到上班时间，不能打卡！");
   }
   console.log("上班打卡...");
@@ -923,7 +1028,7 @@ function lockScreen() {
   device.setBrightnessMode(1); // 自动亮度模式
   device.cancelKeepingAwake(); // 取消设备常亮
 
-  click("一键锁屏");
+  className("android.widget.TextView").text("一键锁屏").findOne().click();
 
   sleep(1000);
 
